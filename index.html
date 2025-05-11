@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kettle Efficiency Analysis</title>
+    <!-- Use Chart.js instead of React/Recharts for better compatibility -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .chart-container {
+            margin-bottom: 40px;
+            border: 1px solid #eaeaea;
+            border-radius: 8px;
+            padding: 15px;
+            background-color: #f9f9f9;
+            height: 400px;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+
+        h2 {
+            color: #444;
+            margin-top: 0;
+        }
+
+        .description {
+            text-align: center;
+            font-size: 14px;
+            color: #666;
+            margin-top: 10px;
+        }
+
+        .findings {
+            background-color: #f0f0f0;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+
+        .findings h2 {
+            margin-top: 0;
+        }
+
+        .findings ul {
+            padding-left: 20px;
+        }
+
+        .findings li {
+            margin-bottom: 8px;
+        }
+
+        pre {
+            background-color: #f5f5f5;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        th,
+        td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #f2f2f2;
+        }
+
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Kettle Efficiency Analysis</h1>
+
+    <!-- Time Comparison Chart -->
+    <div class="chart-container">
+        <h2>Total Boiling Time (seconds)</h2>
+        <canvas id="timeChart"></canvas>
+    </div>
+    <div class="description">
+        <p>Boiling time comparison at different remaining water temperatures</p>
+        <p>(Assuming a 1500W kettle)</p>
+    </div>
+
+    <!-- Cost Comparison Chart -->
+    <div class="chart-container">
+        <h2>Cost Comparison at Different Temperatures ($)</h2>
+        <canvas id="costChart"></canvas>
+    </div>
+
+    <!-- Temperature Effect Chart -->
+    <div class="chart-container">
+        <h2>Effect of Remaining Water Temperature on Cost</h2>
+        <canvas id="tempEffectChart"></canvas>
+    </div>
+
+    <!-- Data Tables -->
+    <div class="findings">
+        <h2>Time Comparison Data</h2>
+        <table id="timeTable">
+            <tr>
+                <th>Scenario</th>
+                <th>Remaining Water Temp (°C)</th>
+                <th>First Boil Time (sec)</th>
+                <th>Second Boil Time (sec)</th>
+                <th>Total Time (sec)</th>
+                <th>Compared to Scenario 1</th>
+            </tr>
+            <!-- Data will be inserted here by JavaScript -->
+        </table>
+    </div>
+
+    <div class="findings">
+        <h2>Cost Comparison Data</h2>
+        <table id="costTable">
+            <tr>
+                <th>Scenario</th>
+                <th>Remaining Water Temp (°C)</th>
+                <th>First Boil Cost ($)</th>
+                <th>Second Boil Cost ($)</th>
+                <th>Total Cost ($)</th>
+                <th>Compared to Scenario 1</th>
+            </tr>
+            <!-- Data will be inserted here by JavaScript -->
+        </table>
+    </div>
+
+    <!-- Key Findings -->
+    <div class="findings">
+        <h2>Key Findings</h2>
+        <ul>
+            <li><strong>Boiling Time:</strong> Scenario 2 is slower than Scenario 1 until the remaining water stays
+                above 70°C</li>
+            <li><strong>Break-even Temperature:</strong> Scenario 2 becomes cheaper than Scenario 1 only when the
+                remaining water stays above 67.9°C</li>
+            <li><strong>At 62°C:</strong> Scenario 2 is still more expensive and slower than Scenario 1</li>
+            <li><strong>Summer Advantage:</strong> In hot weather when water cools more slowly, Scenario 2 becomes more
+                viable</li>
+            <li><strong>Insulation Factor:</strong> Using an insulated kettle would help maintain higher temperatures,
+                potentially making Scenario 2 more efficient</li>
+        </ul>
+    </div>
+
+    <!-- Calculation Details -->
+    <div class="findings">
+        <h2>Calculation Details</h2>
+        <p>All calculations are based on the following parameters:</p>
+        <ul id="parameters">
+            <!-- Parameters will be inserted here by JavaScript -->
+        </ul>
+    </div>
+
+    <!-- Scenarios -->
+    <div class="findings">
+        <h2>Scenario Descriptions</h2>
+        <ul>
+            <li><strong>Scenario 1:</strong> Boil 0.5L of water from room temperature twice (emptying kettle in between)
+            </li>
+            <li><strong>Scenario 2:</strong> Boil 0.8L of water from room temperature, use 0.3L, and later reboil the
+                remaining 0.5L</li>
+        </ul>
+    </div>
+
+    <script>
+        // Constants for calculations
+        const electricityRate = 0.16; // dollars per kWh
+        const jouleToKWh = 1 / 3600000; // conversion factor
+        const waterSpecificHeat = 4186; // J/kg°C
+        const kettlePower = 1500; // Watts (typical electric kettle)
+        const roomTemp = 20; // °C
+        const boilingTemp = 100; // °C
+
+        // Display parameters
+        const parametersList = document.getElementById('parameters');
+        parametersList.innerHTML = `
+            <li>Electricity rate: $${electricityRate}/kWh</li>
+            <li>Water specific heat: ${waterSpecificHeat} J/kg°C</li>
+            <li>Kettle power: ${kettlePower} watts</li>
+            <li>Room temperature: ${roomTemp}°C</li>
+            <li>Boiling temperature: ${boilingTemp}°C</li>
+        `;
+
+        // Calculation functions
+        function calculateEnergy(volume, startTemp, targetTemp = boilingTemp) {
+            return volume * waterSpecificHeat * (targetTemp - startTemp);
+        }
+
+        function calculateBoilTime(volume, startTemp, targetTemp = boilingTemp) {
+            const energy = calculateEnergy(volume, startTemp, targetTemp);
+            return energy / kettlePower; // Time in seconds
+        }
+
+        function calculateCost(volume, startTemp, targetTemp = boilingTemp) {
+            const energy = calculateEnergy(volume, startTemp, targetTemp);
+            return energy * jouleToKWh * electricityRate;
+        }
+
+        // Calculate scenario 1 data
+        const scenario1FirstBoilTime = calculateBoilTime(0.5, roomTemp);
+        const scenario1SecondBoilTime = calculateBoilTime(0.5, roomTemp);
+        const scenario1TotalBoilTime = scenario1FirstBoilTime + scenario1SecondBoilTime;
+        const scenario1FirstBoilCost = calculateCost(0.5, roomTemp);
+        const scenario1SecondBoilCost = calculateCost(0.5, roomTemp);
+        const scenario1TotalCost = scenario1FirstBoilCost + scenario1SecondBoilCost;
+
+        // Calculate scenario 2 data
+        const scenario2FirstBoilTime = calculateBoilTime(0.8, roomTemp);
+        const scenario2FirstBoilCost = calculateCost(0.8, roomTemp);
+
+        // Generate temperature points
+        const temperatures = [30, 35, 40, 45, 50, 55, 60, 62, 65, 67.9, 70, 75, 80];
+
+        // Prepare data for time chart
+        const timeLabels = ['S1 (Room temp 2x)'];
+        const timeData = [scenario1TotalBoilTime];
+
+        // Prepare data for time table
+        const timeTable = document.getElementById('timeTable');
+        timeTable.innerHTML += `
+            <tr>
+                <td>Scenario 1</td>
+                <td>${roomTemp}°C (2x)</td>
+                <td>${scenario1FirstBoilTime.toFixed(0)}</td>
+                <td>${scenario1SecondBoilTime.toFixed(0)}</td>
+                <td>${scenario1TotalBoilTime.toFixed(0)}</td>
+                <td>-</td>
+            </tr>
+        `;
+
+        // Calculate time data for different temperatures
+        temperatures.forEach(temp => {
+            const secondBoilTime = calculateBoilTime(0.5, temp);
+            const totalTime = scenario2FirstBoilTime + secondBoilTime;
+            const timeDiff = totalTime - scenario1TotalBoilTime;
+            const timeDiffPercent = (timeDiff / scenario1TotalBoilTime * 100).toFixed(1);
+
+            // Only add selected temperatures to chart for readability
+            if ([45, 55, 62, 70, 75].includes(temp)) {
+                timeLabels.push(`S2 (${temp}°C remaining)`);
+                timeData.push(totalTime);
+            }
+
+            // Add all to table
+            timeTable.innerHTML += `
+                <tr>
+                    <td>Scenario 2</td>
+                    <td>${temp}°C</td>
+                    <td>${scenario2FirstBoilTime.toFixed(0)}</td>
+                    <td>${secondBoilTime.toFixed(0)}</td>
+                    <td>${totalTime.toFixed(0)}</td>
+                    <td>${timeDiff > 0 ? '+' : ''}${timeDiff.toFixed(0)} sec (${timeDiff > 0 ? '+' : ''}${timeDiffPercent}%)</td>
+                </tr>
+            `;
+        });
+
+        // Prepare data for cost chart
+        const costLabels = ['S1 (Room temp 2x)'];
+        const costData = [scenario1TotalCost];
+
+        // Prepare data for cost table
+        const costTable = document.getElementById('costTable');
+        costTable.innerHTML += `
+            <tr>
+                <td>Scenario 1</td>
+                <td>${roomTemp}°C (2x)</td>
+                <td>$${scenario1FirstBoilCost.toFixed(4)}</td>
+                <td>$${scenario1SecondBoilCost.toFixed(4)}</td>
+                <td>$${scenario1TotalCost.toFixed(4)}</td>
+                <td>-</td>
+            </tr>
+        `;
+
+        // Calculate cost data for different temperatures
+        temperatures.forEach(temp => {
+            const secondBoilCost = calculateCost(0.5, temp);
+            const totalCost = scenario2FirstBoilCost + secondBoilCost;
+            const costDiff = totalCost - scenario1TotalCost;
+            const costDiffPercent = (costDiff / scenario1TotalCost * 100).toFixed(1);
+
+            // Only add selected temperatures to chart for readability
+            if ([45, 55, 62, 67.9, 70, 75].includes(temp)) {
+                costLabels.push(`S2 (${temp}°C remaining)`);
+                costData.push(totalCost);
+            }
+
+            // Add all to table
+            costTable.innerHTML += `
+                <tr>
+                    <td>Scenario 2</td>
+                    <td>${temp}°C</td>
+                    <td>$${scenario2FirstBoilCost.toFixed(4)}</td>
+                    <td>$${secondBoilCost.toFixed(4)}</td>
+                    <td>$${totalCost.toFixed(4)}</td>
+                    <td>${costDiff > 0 ? '+' : ''}$${costDiff.toFixed(4)} (${costDiff > 0 ? '+' : ''}${costDiffPercent}%)</td>
+                </tr>
+            `;
+        });
+
+        // Prepare data for temperature effect chart
+        const tempEffectLabels = temperatures.map(temp => `${temp}°C`);
+        const tempEffectData = temperatures.map(temp => {
+            const secondBoilCost = calculateCost(0.5, temp);
+            return scenario2FirstBoilCost + secondBoilCost;
+        });
+
+        // Create charts
+        // Time Chart
+        const timeCtx = document.getElementById('timeChart').getContext('2d');
+        new Chart(timeCtx, {
+            type: 'bar',
+            data: {
+                labels: timeLabels,
+                datasets: [{
+                    label: 'Boiling Time (seconds)',
+                    data: timeData,
+                    backgroundColor: 'rgba(136, 132, 216, 0.7)',
+                    borderColor: 'rgba(136, 132, 216, 1)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        suggestedMax: 280
+                    }
+                },
+                plugins: {
+                    annotation: {
+                        annotations: {
+                            line1: {
+                                type: 'line',
+                                yMin: scenario1TotalBoilTime,
+                                yMax: scenario1TotalBoilTime,
+                                borderColor: 'red',
+                                borderWidth: 2,
+                                borderDash: [5, 5],
+                                label: {
+                                    content: 'Scenario 1 Time',
+                                    display: true
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        // Cost Chart
+        const costCtx = document.getElementById('costChart').getContext('2d');
+        new Chart(costCtx, {
+            type: 'bar',
+            data: {
+                labels: costLabels,
+                datasets: [{
+                    label: 'Total Cost ($)',
+                    data: costData,
+                    backgroundColor: 'rgba(130, 202, 157, 0.7)',
+                    borderColor: 'rgba(130, 202, 157, 1)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                scales: {
+                    y: {
+                        beginAtZero: false,
+                        suggestedMin: 0.013,
+                        suggestedMax: 0.018
+                    }
+                }
+            }
+        });
+
+        // Temperature Effect Chart
+        const tempEffectCtx = document.getElementById('tempEffectChart').getContext('2d');
+        new Chart(tempEffectCtx, {
+            type: 'line',
+            data: {
+                labels: tempEffectLabels,
+                datasets: [{
+                    label: 'Cost ($)',
+                    data: tempEffectData,
+                    fill: false,
+                    borderColor: 'rgba(255, 115, 0, 1)',
+                    tension: 0.1,
+                    pointRadius: 5
+                },
+                {
+                    label: 'Scenario 1 Cost',
+                    data: Array(temperatures.length).fill(scenario1TotalCost),
+                    fill: false,
+                    borderColor: 'rgba(255, 0, 0, 0.7)',
+                    borderDash: [5, 5],
+                    pointRadius: 0
+                }]
+            },
+            options: {
+                scales: {
+                    y: {
+                        beginAtZero: false,
+                        suggestedMin: 0.013,
+                        suggestedMax: 0.018
+                    }
+                }
+            }
+        });
+    </script>
+</body>
+
+</html>
